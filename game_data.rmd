@@ -61,3 +61,52 @@ print(two_way_table)
 In the two-way table above, the table shows the different amount of genres that each platform has. I find interesting that there is a lot of Pc racing games but less amount of shooter games in the PC platform. The possible relationship of these two variables is that, if you are interested in a specific genre of games, then you can look at this table and see which platform has the most of that genre.
 
 In conclusion, what I found interesting that Switch games have a lower user rating on average and Xbox games has the highest rating on average. I also find that there are more racing games among each platform compared to all the different types of genres. I expected to be more shooter games then racing games.
+
+# Part 2
+
+```{r}
+model <- lm(Active_Players ~ User_Rating, data = df)
+summary(model)
+
+
+plot(df$User_Rating, df$Active_Players, xlab="User Rating", ylab="Active Players" )
+
+abline(model, col="red")
+```
+
+As you can see this simple y ~ x regression is very all over the place and the regression line seems to be in a straight line. This tells me that if a game has a high rating, that doesn't mean people will keep playing the game. I also include statistics above that shows the five point summary of the regression. Below will be the multiple regression.
+
+```{r}
+# Fit the multiple regression model
+model <- lm(Active_Players ~ User_Rating + Global_Sales + Release_Year, data = df)
+
+# Display the summary of the model
+summary(model)
+
+# Scatter plots of y vs each predictor
+par(mfrow = c(1, 3))
+plot(df$User_Rating, df$Active_Players, main = "y vs x1", xlab = "x1", ylab = "y", pch = 16, col = "blue")
+abline(lm(Active_Players ~ User_Rating, data = df), col = "red")
+
+plot(df$Global_Sales, df$Active_Players, main = "y vs x2", xlab = "x2", ylab = "y", pch = 16, col = "green")
+abline(lm(Active_Players~ Global_Sales, data = df), col = "red")
+
+plot(df$Release_Year, df$Active_Players, main = "y vs x3", xlab = "x3", ylab = "y", pch = 16, col = "purple")
+abline(lm(Active_Players~ Release_Year, data = df), col = "red")
+
+# Diagnostic plots
+par(mfrow = c(2, 2))
+plot(model)
+
+# Extract and print statistics
+coefficients <- coef(model)
+print(coefficients)
+
+r_squared <- summary(model)$r.squared
+adj_r_squared <- summary(model)$adj.r.squared
+print(paste("R-squared:", r_squared))
+print(paste("Adjusted R-squared:", adj_r_squared))
+
+p_values <- summary(model)$coefficients[, 4]
+print(p_values)
+```
