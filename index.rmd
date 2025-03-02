@@ -77,28 +77,23 @@ abline(model, col="red")
 As you can see this simple y ~ x regression is very all over the place and the regression line seems to be in a straight line. This tells me that if a game has a high rating, that doesn't mean people will keep playing the game. I also include statistics above that shows the five point summary of the regression. Below will be the multiple regression.
 
 ```{r}
-# Fit the multiple regression model
 model <- lm(Active_Players ~ User_Rating + Global_Sales + Release_Year, data = df)
 
-# Display the summary of the model
 summary(model)
 
-# Scatter plots of y vs each predictor
 par(mfrow = c(1, 3))
-plot(df$User_Rating, df$Active_Players, main = "y vs x1", xlab = "x1", ylab = "y", pch = 16, col = "blue")
+plot(df$User_Rating, df$Active_Players, main = "Active Players vs User Rating", xlab = "User Rating", ylab = "Active Players", pch = 16, col = "blue")
 abline(lm(Active_Players ~ User_Rating, data = df), col = "red")
 
-plot(df$Global_Sales, df$Active_Players, main = "y vs x2", xlab = "x2", ylab = "y", pch = 16, col = "green")
+plot(df$Global_Sales, df$Active_Players, main = "Active Players vs Global Sales", xlab = "Global Sales", ylab = "Active Players", pch = 16, col = "green")
 abline(lm(Active_Players~ Global_Sales, data = df), col = "red")
 
-plot(df$Release_Year, df$Active_Players, main = "y vs x3", xlab = "x3", ylab = "y", pch = 16, col = "purple")
+plot(df$Release_Year, df$Active_Players, main = "Active Players vs Release Year", xlab = "Release Year", ylab = "Active Players", pch = 16, col = "purple")
 abline(lm(Active_Players~ Release_Year, data = df), col = "red")
 
-# Diagnostic plots
 par(mfrow = c(2, 2))
 plot(model)
 
-# Extract and print statistics
 coefficients <- coef(model)
 print(coefficients)
 
@@ -110,3 +105,78 @@ print(paste("Adjusted R-squared:", adj_r_squared))
 p_values <- summary(model)$coefficients[, 4]
 print(p_values)
 ```
+
+As you can see above, the multiple regression is still noisy. In the Active Player vs. User Rating, the regression line seems to be negative, Active Players vs. Global Sales seems to be positive, and Active Players vs. Release Year is also positive. What I find interesting is how Active Players seems to go down when a game has a higher user rating. I also added a statistic to show the five point summary of the multiple regression.
+
+```{r}
+model <- lm(User_Rating ~ Active_Players + Global_Sales + Active_Players:Global_Sales, data = df)
+
+summary(model)
+
+ggplot(df, aes(x = Active_Players, y = User_Rating, color = Global_Sales)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Scatter plot of User Rating vs Active Players, colored by Global Sales",
+       x = "Active Players", y = "User Rating", color = "Global Sales") +
+  theme_minimal()
+
+interaction.plot(df$Active_Players, df$Global_Sales, df$User_Rating,
+                 xlab = "Active Players", ylab = "User Rating", trace.label = "Global Sales",
+                 main = "Interaction Plot of Active Players and Global Sales on User Rating")
+
+par(mfrow = c(2, 2))
+plot(model)
+
+coefficients <- coef(model)
+print(coefficients)
+
+r_squared <- summary(model)$r.squared
+adj_r_squared <- summary(model)$adj.r.squared
+print(paste("R-squared:", r_squared))
+print(paste("Adjusted R-squared:", adj_r_squared))
+
+p_values <- summary(model)$coefficients[, 4]
+print(p_values)
+```
+
+In the multiple regression with the interaction, I decide to change it up a little and Use user rating as y to see if anything became different. In the graph, it appears that the user rating of 6 appears to have lower active players. This graph also show the Global sales, the lighter the color, the higher the sales. AS you can see I also added the interaction plot that shows the interaction between active players and global sales, there is also statistical data I added above.
+
+```{r}
+model <- nls(Global_Sales ~ a * exp(b * User_Rating), data = df, start = list(a = 1, b = 0.1))
+
+summary(model)
+
+plot(df$User_Rating, df$Global_Sales, main = "Non-linear Regression: Exponential Growth",
+     xlab = "User Rating", ylab = "Global Sales", pch = 16, col = "blue")
+
+predict_fun <- function(x) {
+  predict(model, newdata = data.frame(User_Rating = x))
+}
+
+curve(predict_fun(x), add = TRUE, col = "red", lwd = 2)
+
+legend("topleft", legend = c("Data Points", "Fitted Curve"),
+       col = c("blue", "red"), pch = c(16, NA), lty = c(NA, 1))
+
+fitted_values <- predict(model)
+residuals <- residuals(model)
+
+par(mfrow = c(1, 2)) 
+plot(fitted_values, residuals, main = "Residuals vs Fitted",
+     xlab = "Fitted Values", ylab = "Residuals", pch = 16, col = "blue")
+abline(h = 0, col = "red", lty = 2)
+
+qqnorm(residuals, main = "Normal Q-Q Plot of Residuals", pch = 16, col = "blue")
+qqline(residuals, col = "red")
+
+parameters <- coef(model)
+print(parameters)
+
+resid_se <- summary(model)$sigma
+print(paste("Residual Standard Error:", resid_se))
+
+conf_int <- confint(model)
+print(conf_int)
+```
+
+Above is the non-linear regression. It looks like there is not much of a growth happening on both the exponential growth and the residuals vs fitted graphs. The Q-Q plot has a increasing regression line which I found interesting. 
