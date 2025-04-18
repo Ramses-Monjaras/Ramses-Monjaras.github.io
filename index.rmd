@@ -10,6 +10,13 @@ library(boot)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(caret)
+library(lattice)
+library(rpart)
+library(rpart.plot)
+library(purrr)
+library(datasets)
+library(e1071)
 knitr::opts_chunk$set(echo = TRUE)
 df <- read.csv("game_dataset.csv")
 ```
@@ -180,3 +187,196 @@ print(conf_int)
 ```
 
 Above is the non-linear regression. It looks like there is not much of a growth happening on both the exponential growth and the residuals vs fitted graphs. The Q-Q plot has a increasing regression line which I found interesting. 
+
+#Part 3
+
+```{r}
+tree <- rpart(Platform ~ Active_Players + User_Rating, data = df, control = rpart.control(minslpit = 2, minbucket = 1, cp = 0.01))
+tree <- rpart(Platform ~., data =df[, c("Platform", "User_Rating", "Active_Players")])
+
+
+rpart.plot(tree, extra = 2,
+           type = 4,
+           fallen.leaves = TRUE,
+           box.palette="white",
+           branch.lty = 3,
+           shadow.col = "gray")
+
+
+pred <- predict(tree, type = "class")
+head(pred)
+
+predict(tree) |> head()
+
+confusionMatrix(table(predicted =pred, actual = df$Platform))
+
+summary(tree)
+
+
+```
+
+
+Above is the simple decision tree and I'm using the game platform as my categorical variable. I also have a confusion matrix that shows the prediction of the game platform. I believe that the active players is the most important variable.
+
+```{r}
+
+train_control <- trainControl(
+  method = "cv",        
+  number = 10,          
+  savePredictions = TRUE,
+  classProbs = TRUE,    
+  summaryFunction = multiClassSummary  
+)
+
+
+set.seed(42)
+tree_model_cv <- train(
+  Platform ~ Active_Players + User_Rating,
+  data = df,
+  method = "rpart",
+  trControl = train_control,
+  tuneLength = 5,       # Try 5 different complexity parameters
+  metric = "Accuracy"   # Optimization metric
+)
+
+
+print(tree_model_cv)
+
+
+cv_results <- tree_model_cv$results
+print(cv_results)
+
+
+print(paste("Optimal cp:", tree_model_cv$bestTune$cp))
+
+
+cv_confusion <- confusionMatrix(tree_model_cv$pred$pred, tree_model_cv$pred$obs)
+print(cv_confusion)
+
+
+ggplot(as.data.frame(cv_confusion$table), 
+       aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "white", high = "steelblue") +
+  labs(title = "Cross-Validated Confusion Matrix", 
+       x = "Actual Platform", 
+       y = "Predicted Platform") +
+  theme_minimal()
+
+
+var_imp <- varImp(tree_model_cv)
+plot(var_imp, main = "Variable Importance from Cross-Validated Model")
+
+
+rpart.plot(
+  tree_model_cv$finalModel,
+  type = 4,
+  extra = 104,
+  box.palette = "Blues",
+  shadow.col = "gray",
+  nn = TRUE,
+  main = "Optimized Decision Tree (After Cross-Validation)"
+)
+```
+
+
+I repeated my decision tree above but this time I'm using the k-fold validation as a cross validation technique. Using this technique seems to have a higher accuracy compared to the first model. The model does seem to over fit because the decision tree is very complex. I also notice that the confusion matrix shows all the prediction of all the game platforms.
+
+```{r}
+set.seed(123)
+train_index <- createDataPartition(df$Platform, p = 0.7, list = FALSE)
+train_data <- df[train_index, ]
+test_data <- df[-train_index, ]
+
+
+
+
+tree_model <- rpart(Platform ~ Active_Players + User_Rating,
+                    data = train_data,
+                    method = "class")
+
+
+rpart.plot(tree_model, main = "Decision Tree for Game Platform Classification",
+           box.palette = "BuGn", shadow.col = "gray", nn = TRUE)
+
+
+tree_pred <- predict(tree_model, test_data, type = "class")
+
+
+
+
+
+importance <- tree_model$variable.importance
+importance_df <- data.frame(Variable = names(importance), Importance = importance)
+importance_df <- importance_df[order(-importance_df$Importance), ]
+
+
+ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "Variable Importance in Decision Tree",
+       x = "Variables",
+       y = "Importance") +
+  theme_minimal()
+
+
+cat("The most important variables for platform classification are:\n")
+print(head(importance_df, 3))
+cat("\nFrom the variable importance analysis, we can see that", 
+    importance_df$Variable[1], "is the most significant predictor of game platform,",
+    "followed by", importance_df$Variable[2], "and", importance_df$Variable[3], 
+    ". This suggests that these features have the strongest influence on determining",
+    "which platform a game might belong to.")
+
+
+
+
+train_data$Platform <- as.factor(train_data$Platform)
+test_data$Platform <- as.factor(test_data$Platform)
+
+
+svm_formula <- Platform ~ Active_Players + User_Rating
+svm_train_x <- model.matrix(svm_formula, data = train_data)[,-1]  
+svm_train_y <- train_data$platform
+
+svm_test_x <- model.matrix(svm_formula, data = test_data)[,-1]
+svm_test_y <- test_data$platform
+
+
+train_data$platform <- as.factor(train_data$Platform)
+test_data$platform <- as.factor(test_data$Platform)
+
+
+
+svm_train_x <- model.matrix(Platform ~ Active_Players + User_Rating, 
+                           data = train_data)
+
+svm_test_x <- model.matrix(Platform ~ Active_Players + User_Rating,
+                          data = test_data)
+
+
+svm_train_y <- train_data$Platform
+svm_test_y <- test_data$Platform
+
+
+preProc <- preProcess(svm_train_x, method = c("center", "scale"))
+svm_train_x_scaled <- predict(preProc, svm_train_x)
+svm_test_x_scaled <- predict(preProc, svm_test_x)
+
+
+svm_model <- svm(x = svm_train_x_scaled,
+                 y = svm_train_y,
+                 type = "C-classification",
+                 kernel = "radial",
+                 probability = TRUE,
+                 scale = FALSE)  
+
+svm_pred <- predict(svm_model, svm_test_x_scaled)
+
+conf_matrix <- confusionMatrix(svm_pred, svm_test_y)
+print(conf_matrix)
+
+```
+
+Above I use the same categorical variable of the game platform but this time I use SVM to train the variable. In this model the accuracy is higher than the first model but less then the second. The Active Players is still an important variable in the decision tree.
