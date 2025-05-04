@@ -17,6 +17,8 @@ library(rpart.plot)
 library(purrr)
 library(datasets)
 library(e1071)
+library(cluster)
+library(factoextra)
 knitr::opts_chunk$set(echo = TRUE)
 df <- read.csv("game_dataset.csv")
 ```
@@ -380,3 +382,27 @@ print(conf_matrix)
 ```
 
 Above I use the same categorical variable of the game platform but this time I use SVM to train the variable. In this model the accuracy is higher than the first model but less then the second. The Active Players is still an important variable in the decision tree.
+
+#Part 4
+
+```{r}
+cl <- kmeans(df[,c("Global_Sales", "User_Rating")],2)
+plot(df[,c("Global_Sales","User_Rating")], col = cl$cluster)# pch =df$Platform)
+points(cl$cluster, col = 1:3, pch = 8, cex = 2)
+```
+
+```{r}
+# Set the maximum number of clusters to evaluate
+max_clusters <- 10
+
+# Calculate within-cluster sum of squares for different cluster counts
+wss <- sapply(1:max_clusters, function(k) {
+  kmeans(df[, c("Global_Sales", "User_Rating")], k, nstart = 20)$tot.withinss
+})
+
+# Plot the elbow curve
+plot(1:max_clusters, wss, type = "b", 
+     xlab = "Number of Clusters", ylab = "Within-cluster sum of squares",
+     main = "Hocky Stick Method for Optimal k")
+```
+
