@@ -19,6 +19,7 @@ library(datasets)
 library(e1071)
 library(cluster)
 library(factoextra)
+library(dbscan)
 knitr::opts_chunk$set(echo = TRUE)
 df <- read.csv("game_dataset.csv")
 ```
@@ -389,20 +390,24 @@ Above I use the same categorical variable of the game platform but this time I u
 cl <- kmeans(df[,c("Global_Sales", "User_Rating")],2)
 plot(df[,c("Global_Sales","User_Rating")], col = cl$cluster)# pch =df$Platform)
 points(cl$cluster, col = 1:3, pch = 8, cex = 2)
+
+fviz_nbclust(x = df[,c("Global_Sales","User_Rating")],FUNcluster = kmeans, method = 'wss' )
 ```
+
+
+In part 4, I picked the game's platform as my categorical variable. As you can see above, the table shows the k means clustering with 2 different clusters. As you can see above there is also a table the shows the optimal number of clusters, it shows that 2 is the optimal number.  
 
 ```{r}
-# Set the maximum number of clusters to evaluate
-max_clusters <- 10
+res <- dbscan(df[,c("Global_Sales", "User_Rating")], eps = 3, minPts = 5)
+plot(df[,c("Global_Sales", "User_Rating")], col = res$cluster)
+points(df[res$cluster == 0,c("Global_Sales", "User_Rating")], pch = 3, col = "grey")
 
-# Calculate within-cluster sum of squares for different cluster counts
-wss <- sapply(1:max_clusters, function(k) {
-  kmeans(df[, c("Global_Sales", "User_Rating")], k, nstart = 20)$tot.withinss
-})
+clplot(df[,c("Global_Sales", "User_Rating")],res)
 
-# Plot the elbow curve
-plot(1:max_clusters, wss, type = "b", 
-     xlab = "Number of Clusters", ylab = "Within-cluster sum of squares",
-     main = "Hocky Stick Method for Optimal k")
+x <- scale(df[,c("Global_Sales", "User_Rating")])
+
+res <- dbscan(x, eps = 0.2)
+clplot(x,res)
 ```
 
+Above, I use the DBSCAN for my categorical variable. The main difference I can see is that the clustering has two different groups but the dbscan is all one group. There isn't any outliers from clustering and the dbscan that I've seen. From the two different techniques I think it is not fair to compare them because the dbscan is looking for patterns and clustering is looking for which data is closer to each other.
